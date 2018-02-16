@@ -4,11 +4,10 @@ using Android.OS;
 using Android.Locations;
 using Android.Content;
 using Android.Runtime;
-using Android.Provider;
 using System;
 using System.IO;
-using Android;
 using System.Threading.Tasks;
+using Mono.Data.Sqlite;
 
 namespace GPSApp
 {
@@ -20,6 +19,7 @@ namespace GPSApp
         TextView LongitudeTextView;
         TextView EstadoTextView;
         TextView DisponibilidadTextView;
+        Database db;
 
         protected override void OnCreate(Bundle savedInstanceState)
         {
@@ -35,6 +35,9 @@ namespace GPSApp
 
             LatitudeTextView.Text = "000";
             LongitudeTextView.Text = "000";
+
+            db = new Database();
+            var coods = db.SelectCoordenate();
         }
 
         protected override void OnResume()
@@ -42,6 +45,7 @@ namespace GPSApp
             base.OnResume();
             string Provider = LocationManager.GpsProvider;
             if (locMgr.IsProviderEnabled(Provider))
+            //if (locMgr.IsProviderEnabled(Provider) && locMgr.IsProviderEnabled(LocationManager.NetworkProvider))
             {
                 locMgr.RequestLocationUpdates(Provider, 100, 0.3f, this);
                 locMgr.RequestLocationUpdates(LocationManager.NetworkProvider, 0, 0, this);
@@ -63,11 +67,21 @@ namespace GPSApp
 
         public void OnLocationChanged(Location location)
         {
-            LatitudeTextView.Text = location.Latitude.ToString() + "\nSexigesimal " + ConvertToDMS(location.Latitude, "\nDegree {0}\nMins {1}\nSecs {2}\n");
-            LongitudeTextView.Text = location.Longitude.ToString() + "\nSexigesimal " + ConvertToDMS(location.Longitude, "\nDegree {0}\nMins {1}\nSecs {2}\n");
+            LatitudeTextView.Text = $"{location.Latitude.ToString()}\nSexigesimal {ConvertToDMS(location.Latitude, "\nDegree {0}\nMins {1}\nSecs {2}\n")}";
+            LongitudeTextView.Text = $"{location.Longitude.ToString()}\nSexigesimal {ConvertToDMS(location.Longitude, "\nDegree {0}\nMins {1}\nSecs {2}\n")}";
             Task.Run(async () =>
             {
                 await SaveCoordenates(location.Latitude, location.Longitude);
+                string time = DateTime.Now.ToString("dd/MM/yyyy hh:mm:ss");
+                db.InsertCoordenate(location.Latitude, location.Longitude, time);
+                var gpsSender = new GPSSender();
+
+                gpsSender.Send(gpsSender.Serialize(new
+                {
+                    location.Latitude,
+                    location.Longitude,
+                    Date = time
+                }));
             });
         }
 
